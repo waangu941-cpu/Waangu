@@ -1,0 +1,46 @@
+# Environment files (NEVER commit)
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env
+
+# Python
+venv/
+env/
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+dist-ssr/
+.vite/
+*.local
+
+# Test audio
+*.wav
+*.mp3
+*.webm
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Hugging Face cache
+.cache/
