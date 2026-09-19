@@ -44,3 +44,16 @@ npm-debug.log*
 
 # Hugging Face cache
 .cache/
+
+# ML data and models (large, downloadable)
+ml/sign-recognition/data/
+ml/sign-recognition/models/
+ml/sign-recognition/venv/
+*.pkl
+*.keras
+*.h5
+
+# KSL/Kaggle downloads
+Downloads/
+ksl_data/
+*.zip
