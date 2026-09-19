@@ -1,2 +1,20 @@
 /* src/index.css */
 @import "tailwindcss";
+
+/* Accessibility settings applied via the <html> class */
+.a11y-large-text {
+  font-size: 18px;
+}
+
+.a11y-large-text body {
+  font-size: 1rem;
+}
+
+.a11y-high-contrast {
+  filter: contrast(1.1) saturate(1.15);
+}
+
+.a11y-high-contrast a,
+.a11y-high-contrast button {
+  font-weight: 600;
+}
