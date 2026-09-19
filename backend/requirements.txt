@@ -1,7 +1,13 @@
-fastapi==0.115.0
-uvicorn[standard]==0.32.0
-python-multipart==0.0.12
-python-dotenv==1.0.1
-supabase==2.9.0
-faster-whisper==1.1.0
-httpx==0.27.2
+# Web framework
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+python-multipart>=0.0.12
+python-dotenv>=1.0.1
+httpx>=0.27.2
+
+# Speech-to-text (the big one — pulls ctranslate2, onnxruntime, tokenizers)
+faster-whisper>=1.1.0
+
+# Note: the `supabase` Python package is NOT needed here.
+# The backend doesn't touch Supabase directly — the frontend uses
+# the Supabase JS client, and the backend only runs STT.
