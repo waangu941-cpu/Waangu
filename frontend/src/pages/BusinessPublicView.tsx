@@ -11,16 +11,16 @@ import {
   type CommunicationRequest,
 } from "../services/business.service";
 import { getCurrentUser } from "../services/auth.service";
+import { useToast } from "../hooks/useToast";
 import Header from "../components/Header";
 import type { Business } from "../types";
-import { useToast } from "../hooks/useToast";
 
 export default function BusinessPublicView() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
   const { push } = useToast();
+
   const [business, setBusiness] = useState<Business | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
   const [staffAvailable, setStaffAvailable] = useState<boolean | null>(null);
   const [myRequest, setMyRequest] = useState<CommunicationRequest | null>(null);
   const [requestMessage, setRequestMessage] = useState("");
@@ -36,7 +36,6 @@ export default function BusinessPublicView() {
 
       try {
         const user = await getCurrentUser();
-        setUserId(user?.id ?? null);
 
         const biz = await getBusinessByQrToken(token);
         if (!biz) {
@@ -86,7 +85,7 @@ export default function BusinessPublicView() {
     }
   }
 
-   async function handleSubmitRequest(e: FormEvent) {
+  async function handleSubmitRequest(e: FormEvent) {
     e.preventDefault();
     if (!business) return;
     setError(null);
@@ -99,14 +98,10 @@ export default function BusinessPublicView() {
         return;
       }
 
-      const requestId = await createCommunicationRequest(
-        business.id,
-        requestMessage
-      );
+      await createCommunicationRequest(business.id, requestMessage);
       const req = await getMyPendingRequest(business.id, user.id);
       if (req) setMyRequest(req);
       setRequestMessage("");
-      void requestId;
       push("Request sent. Staff will respond when available.", "success");
     } catch (e) {
       setError(
@@ -198,7 +193,6 @@ export default function BusinessPublicView() {
               </div>
             )}
 
-            {/* Already have a pending request */}
             {myRequest ? (
               <div className="bg-blue-50 border border-blue-200 text-blue-900 rounded-lg p-4">
                 <p className="font-medium mb-1">Your request is in the queue</p>
@@ -220,7 +214,7 @@ export default function BusinessPublicView() {
               </div>
             ) : staffAvailable ? (
               <>
-                                <p className="text-sm text-gray-700 mb-3">
+                <p className="text-sm text-gray-700 mb-3">
                   How would you like to communicate?{" "}
                   <span className="text-xs text-gray-500">
                     (Pick the one that fits you best — you can still use any of
@@ -264,7 +258,9 @@ export default function BusinessPublicView() {
                             : "border-gray-200 bg-white hover:border-gray-300"
                         }`}
                       >
-                        <span className="text-2xl flex-shrink-0">{opt.icon}</span>
+                        <span className="text-2xl flex-shrink-0">
+                          {opt.icon}
+                        </span>
                         <span className="flex-1 min-w-0">
                           <span className="block text-sm font-medium text-gray-900">
                             {opt.label}
