@@ -7,11 +7,18 @@ interface AudioRecorderProps {
   backendUrl?: string;
 }
 
+interface AudioRecorderProps {
+  onTranscribed: (text: string) => void;
+  onError: (msg: string) => void;
+  disabled?: boolean;
+  backendUrl?: string;
+}
+
 export default function AudioRecorder({
   onTranscribed,
   onError,
   disabled,
-  backendUrl = "http://localhost:8000",
+  backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000",
 }: AudioRecorderProps) {
   const [recording, setRecording] = useState(false);
   const [processing, setProcessing] = useState(false);
