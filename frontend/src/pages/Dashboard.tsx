@@ -24,10 +24,17 @@ export default function Dashboard() {
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Cancellation guard: without it, a user who navigates away mid-load
+    // (or straight to /login when getCurrentUser resolves) risks a late
+    // response calling setState after unmount.
+    let cancelled = false;
+
     async function load() {
       const user = await getCurrentUser();
+      if (cancelled) return;
       if (!user) {
         navigate("/login");
         return;
@@ -35,28 +42,61 @@ export default function Dashboard() {
       setEmail(user.email);
       setUserId(user.id);
 
-      try {
-        const profile = await getProfile(user.id);
-        if (profile?.display_name) setDisplayName(profile.display_name);
-      } catch {
-        // ignore
+      // These three are independent — fetching them sequentially with
+      // `await` one after another (as before) adds up their latencies
+      // instead of overlapping them. Promise.allSettled runs them
+      // concurrently *and* lets one fail without blocking the other two
+      // (unlike Promise.all, which would reject the whole batch).
+      const [profileResult, sessionsResult, businessesResult] =
+        await Promise.allSettled([
+          getProfile(user.id),
+          listMySessions(20),
+          listMyBusinesses(user.id),
+        ]);
+      if (cancelled) return;
+
+      if (profileResult.status === "fulfilled") {
+        if (profileResult.value?.display_name) {
+          setDisplayName(profileResult.value.display_name);
+        }
+      } else {
+        // Non-fatal: falls back to no display name. Still worth logging so
+        // a real backend issue doesn't go unnoticed.
+        console.warn("Could not load profile:", profileResult.reason);
       }
 
-      try {
-        const s = await listMySessions(20);
-        setSessions(s);
-      } catch {
-        // ignore
+      if (sessionsResult.status === "fulfilled") {
+        setSessions(sessionsResult.value);
+      } else {
+        console.error("Could not load sessions:", sessionsResult.reason);
       }
 
-      try {
-        const b = await listMyBusinesses(user.id);
-        setBusinesses(b);
-      } catch {
-        // ignore
+      if (businessesResult.status === "fulfilled") {
+        setBusinesses(businessesResult.value);
+      } else {
+        console.error("Could not load businesses:", businessesResult.reason);
       }
+
+      // Previously these failures were fully swallowed — an empty "No
+      // sessions yet" state looked identical to "sessions failed to load",
+      // with no way for the user (or you, debugging a report) to tell the
+      // difference. Surface it, without blocking the parts that did load.
+      if (
+        sessionsResult.status === "rejected" ||
+        businessesResult.status === "rejected"
+      ) {
+        setError(
+          "Some of your data couldn't be loaded. Try refreshing the page."
+        );
+      }
+
+      setLoading(false);
     }
+
     load();
+    return () => {
+      cancelled = true;
+    };
   }, [navigate]);
 
   async function handleDelete(sessionId: string, title: string) {
@@ -128,7 +168,10 @@ export default function Dashboard() {
 
         {/* Error */}
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg p-3 mb-4">
+          <div
+            role="alert"
+            className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg p-3 mb-4"
+          >
             {error}
           </div>
         )}
@@ -285,7 +328,11 @@ export default function Dashboard() {
           )}
         </div>
 
-        {sessions.length === 0 ? (
+        {loading ? (
+          <div className="bg-white shadow-sm rounded-lg p-8 text-center text-gray-500 text-sm">
+            Loading your sessions…
+          </div>
+        ) : sessions.length === 0 ? (
           <div className="bg-white shadow-sm rounded-lg p-8 text-center">
             <div className="text-4xl mb-3">✨</div>
             <p className="text-gray-600 mb-1">No sessions yet.</p>

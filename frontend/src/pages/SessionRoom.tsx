@@ -51,10 +51,19 @@ export default function SessionRoom() {
 
   // Load session + user
   useEffect(() => {
+    // Guards against two failure modes that are easy to miss in a plain
+    // `load()` call: (1) setState firing after the component has unmounted
+    // (React warns, and it's wasted work), and (2) a stale response landing
+    // after `id` has already changed — e.g. the user navigates from one
+    // session to another before the first session's fetch resolves, and its
+    // late response overwrites the second session's freshly-loaded state.
+    let cancelled = false;
+
     async function load() {
       if (!id) return;
 
       const user = await getCurrentUser();
+      if (cancelled) return;
       if (!user) {
         navigate("/login");
         return;
@@ -63,37 +72,53 @@ export default function SessionRoom() {
 
       try {
         const profile = await getProfile(user.id);
+        if (cancelled) return;
         if (profile?.display_name) setDisplayName(profile.display_name);
-      } catch {
-        // ignore
+      } catch (e) {
+        // Non-fatal: falls back to the "You" default. Still worth a log so
+        // a real backend/permissions problem doesn't go unnoticed.
+        console.warn("Could not load profile:", e);
       }
 
       try {
         const s = await getSession(id);
+        if (cancelled) return;
         if (!s) {
           setLoadError("Session not found or you don't have access.");
         } else {
           setSession(s);
 
           if (s.session_type === "business" && s.business_id) {
-            const { data: staffRow } = await supabase
+            const { data: staffRow, error: staffError } = await supabase
               .from("business_staff")
               .select("id")
               .eq("business_id", s.business_id)
               .eq("user_id", user.id)
               .maybeSingle();
+            if (cancelled) return;
+            if (staffError) {
+              // Don't silently treat a failed check as "not staff" — log it
+              // so an RLS/permissions regression is visible instead of just
+              // quietly hiding the "End session" button from real staff.
+              console.error("Staff lookup failed:", staffError);
+            }
             setIsBusinessStaff(Boolean(staffRow));
           }
         }
       } catch (e) {
+        if (cancelled) return;
         setLoadError(
           e instanceof Error ? e.message : "Could not load session."
         );
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
+
     load();
+    return () => {
+      cancelled = true;
+    };
   }, [id, navigate]);
 
   // Auto-scroll on new messages
@@ -103,6 +128,15 @@ export default function SessionRoom() {
       behavior: "smooth",
     });
   }, [messages]);
+
+  // Stop any in-progress text-to-speech when leaving the room — otherwise a
+  // message can keep being read aloud after the user has navigated away.
+  useEffect(() => {
+    return () => {
+      speech.stop();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleSend(e: FormEvent) {
     e.preventDefault();
@@ -257,6 +291,7 @@ export default function SessionRoom() {
               onClick={() => {
                 clearMessageError();
                 setSendError(null);
+                setLoadError(null);
               }}
               className="text-red-500 hover:text-red-700 text-lg leading-none"
               aria-label="Dismiss error"
@@ -313,6 +348,9 @@ export default function SessionRoom() {
         {/* Messages */}
         <div
           ref={scrollRef}
+          role="log"
+          aria-live="polite"
+          aria-relevant="additions"
           className="flex-1 bg-white shadow-sm rounded-xl p-3 sm:p-4 overflow-y-auto mb-3 min-h-[400px]"
         >
           {messages.length === 0 && (
